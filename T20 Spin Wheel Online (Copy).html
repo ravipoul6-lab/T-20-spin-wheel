@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>T20 Spin Wheel Online (Copy)</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f2f5f0;--card:#fff;--ink:#14231b;--mute:#5c6b62;--line:#d5ddd6;--x:#0b6b4a;--y:#c2410c;--btn:#14231b;--btnink:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1a14;--card:#15271e;--ink:#eaf2ec;--mute:#93a69a;--line:#274036;--x:#3ddc97;--y:#ff9256;--btn:#eaf2ec;--btnink:#0d1a14}}
+:root[data-theme="dark"]{--bg:#0d1a14;--card:#15271e;--ink:#eaf2ec;--mute:#93a69a;--line:#274036;--x:#3ddc97;--y:#ff9256;--btn:#eaf2ec;--btnink:#0d1a14}
+*,*:before,*:after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;line-height:1.45}
+main{max-width:980px;margin:0 auto;padding:18px 14px 40px}
+h1{font-size:clamp(26px,5vw,38px);font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
+.sub{color:var(--mute);margin:0 0 16px;max-width:60ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media(max-width:760px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.turn{font-weight:800;font-size:20px;margin-bottom:8px}
+.wheelbox{position:relative;width:100%;max-width:420px;margin:0 auto}
+canvas{width:100%;height:auto;display:block}
+.ptr{position:absolute;left:50%;top:-4px;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:26px solid var(--ink);z-index:2}
+button{font:inherit;cursor:pointer}
+.spin{display:block;margin:12px auto 0;background:var(--btn);color:var(--btnink);border:0;border-radius:999px;padding:12px 32px;font-weight:800;font-size:17px}
+.spin:disabled{opacity:.4;cursor:not-allowed}
+.left{text-align:center;color:var(--mute);font-size:14px;margin-top:8px}
+.pname{font-size:24px;font-weight:800}
+.pmeta{color:var(--mute);margin-bottom:10px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat{border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:8px 10px;text-align:left}
+.stat b{display:block;font-size:20px}
+.stat span{font-size:13px;color:var(--mute)}
+.stat:hover:not(:disabled){border-color:var(--ink)}
+.stat:disabled{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+th{font-weight:600;color:var(--mute)}
+.tx{color:var(--x)}.ty{color:var(--y)}
+.win{font-weight:800}
+.hint{color:var(--mute);font-size:14px}
+.reset:disabled{opacity:.4;cursor:not-allowed}
+.reset{background:transparent;border:1.5px solid var(--ink);color:var(--ink);border-radius:999px;padding:8px 18px;margin-top:10px}
+.table-wrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+<h1>T20 Spin Wheel Online</h1>
+<p class="sub">Do log alag-alag device se khelte hain. Wheel dono ko live dikhta hai, lekin aapke chune hue stats game khatam hone tak sirf aapko dikhte hain.</p>
+<div id="msg" class="card" style="display:none;margin-bottom:14px"></div>
+<div class="grid">
+  <div class="card">
+    <div class="turn" id="turn"></div>
+    <div class="wheelbox"><div class="ptr"></div><canvas id="wheel" width="840" height="840"></canvas></div>
+    <button class="spin" id="spin">SPIN</button>
+    <div class="left" id="left"></div>
+  </div>
+  <div>
+    <div class="card" id="pick" style="margin-bottom:16px"></div>
+    <div class="card table-wrap"><table id="board"></table><p class="hint" id="bh" style="margin:8px 0 0"></p></div>
+  </div>
+</div>
+</main>
+<script>
+// [name, country, M, Runs, BatAvg, SR, Wkts, BowlAvg, Econ, Catches] (approximate career T20I figures)
+const RAW=[
+["Virat Kohli","IND",125,4188,48.7,137.0,4,50.3,8.8,56],["Rohit Sharma","IND",159,4231,32.1,140.9,1,13.0,7.0,65],
+["Suryakumar Yadav","IND",90,2598,37.1,167.7,0,null,null,25],["Jasprit Bumrah","IND",70,26,6.5,90,89,17.7,6.3,15],
+["Hardik Pandya","IND",110,1800,26.1,140.1,94,27.1,8.4,45],["Rashid Khan","AFG",100,600,12.0,140.0,161,13.9,6.1,30],
+["Mohammad Nabi","AFG",100,1800,22.0,135.0,70,23.4,7.5,50],["Babar Azam","PAK",128,4223,41.0,129.2,0,null,null,55],
+["Mohammad Rizwan","PAK",106,3313,49.0,127.9,0,null,null,60],["Shaheen Afridi","PAK",60,50,7.0,110,100,20.0,8.1,15],
+["Jos Buttler","ENG",144,3457,35.3,144.1,0,null,null,75],["Jofra Archer","ENG",30,50,10.0,130,46,20.6,7.4,8],
+["Phil Salt","ENG",60,1800,32.0,165.0,0,null,null,20],["Glenn Maxwell","AUS",120,2500,28.1,155.6,42,32.0,8.2,65],
+["David Warner","AUS",110,3277,33.4,142.5,0,null,null,38],["Mitchell Starc","AUS",65,90,10.0,110,79,23.0,7.7,10],
+["Adam Zampa","AUS",100,140,9.0,115,130,20.0,7.6,25],["Kane Williamson","NZ",93,2575,33.4,125.3,3,40.0,8.0,45],
+["Trent Boult","NZ",61,60,7.0,100,83,22.5,7.9,15],["Tim Southee","NZ",126,300,10.0,130,164,22.6,8.2,40],
+["Quinton de Kock","SA",92,2600,26.5,138.0,0,null,null,70],["Kagiso Rabada","SA",65,100,8.0,120,80,21.5,7.7,10],
+["Heinrich Klaasen","SA",58,1200,30.0,155.0,0,null,null,25],["Nicholas Pooran","WI",100,2200,25.6,135.0,0,null,null,35],
+["Andre Russell","WI",84,1100,24.0,168.0,60,22.0,9.0,35],["Sunil Narine","WI",55,250,9.0,120.0,55,20.5,6.0,20],
+["Shakib Al Hasan","BAN",129,2551,23.3,123.0,149,20.5,7.0,55],["Wanindu Hasaranga","SL",62,700,17.0,145.0,100,15.5,7.4,30],
+["Sikandar Raza","ZIM",100,2400,25.0,140.0,60,25.0,7.4,35],["Paul Stirling","IRE",130,3500,28.5,136.0,15,28.0,7.8,60]
+];
+const S=[
+ {k:2,l:"Matches",hi:1},{k:3,l:"Runs",hi:1},{k:4,l:"Batting avg",hi:1},{k:5,l:"Strike rate",hi:1},
+ {k:6,l:"Wickets",hi:1},{k:7,l:"Bowling avg",hi:0},{k:8,l:"Economy",hi:0},{k:9,l:"Catches",hi:1}];
+
+const $=id=>document.getElementById(id);
+const cv=$("wheel"),ctx=cv.getContext("2d");
+const last=n=>n.split(" ").slice(-1)[0];
+let db,uid,stRef,ST=null,FIN={X:null,Y:null},mine={},seat=null,angle=0,animating=false,lastSpin=null,curGame=null,wroteFinal=false,first=true,canWrite=true;
+
+const fresh=(seats)=>({game:Date.now()+"-"+Math.floor(Math.random()*1e6),seats:seats||{X:null,Y:null},removed:[],turn:"X",spin:null,cnt:{X:0,Y:0},skips:{X:3,Y:3},over:false});
+const remaining=()=>RAW.map((_,i)=>i).filter(i=>!ST.removed.includes(i));
+const better=(a,b,s)=>{const A=score(a,s),B=score(b,s);return A===B?0:((s.hi?A>B:A<B)?1:-1)};
+function note(t){const m=$("msg");m.style.display=t?"block":"none";m.textContent=t||""}
+async function put(o){try{await stRef.set(o)}catch(e){note("Write nahi ho paya ("+(e.code||"error")+"). Is page par khelne ke liye Contributor/Editor access chahiye.")}}
+
+function draw(){
+ ctx.clearRect(0,0,840,840);if(!ST)return;
+ const rem=remaining(),n=rem.length,c=420,r=412;if(!n)return;const st=2*Math.PI/n;
+ rem.forEach((ri,i)=>{
+  const a0=angle+i*st;ctx.beginPath();ctx.moveTo(c,c);ctx.arc(c,c,r,a0,a0+st);ctx.closePath();
+  ctx.fillStyle=`hsl(${(ri*137.5)%360},55%,${i%2?40:48}%)`;ctx.fill();ctx.strokeStyle="rgba(255,255,255,.6)";ctx.lineWidth=2;ctx.stroke();
+  ctx.save();ctx.translate(c,c);ctx.rotate(a0+st/2);ctx.textAlign="right";ctx.fillStyle="#fff";
+  ctx.font=`700 ${n>22?21:n>14?26:32}px Archivo,sans-serif`;ctx.fillText(last(RAW[ri][0]),r-16,9);ctx.restore();
+ });
+ ctx.beginPath();ctx.arc(c,c,34,0,7);ctx.fillStyle=getComputedStyle(document.body).backgroundColor;ctx.fill();
+}
+
+function startSpin(sp,instant){
+ const rem=remaining(),t=rem.indexOf(sp.idx);if(t<0)return;
+ const st=2*Math.PI/rem.length,target=-Math.PI/2-(t+.5)*st+sp.jit*st*.7;
+ if(instant){angle=target;animating=false;return}
+ let end=target;const start=angle;while(end>start-12*Math.PI)end-=2*Math.PI;
+ animating=true;const t0=performance.now(),dur=4200;
+ (function f(now){const p=Math.min(1,(now-t0)/dur),e=1-Math.pow(1-p,4);angle=start+(end-start)*e;draw();
+  if(p<1)requestAnimationFrame(f);else{angle=end;animating=false;render();}})(t0);
+}
+
+async function loadMine(){
+ try{const d=await db.doc("data/users/"+uid+"/t20").get();mine=(d.exists&&d.data().game===curGame)?d.data().picks:{};}catch(e){mine={}}
+ render();
+}
+async function saveMine(){try{await db.doc("data/users/"+uid+"/t20").set({game:curGame,picks:mine})}catch(e){note("Aapke stats save nahi ho paye ("+(e.code||"error")+").")}}
+
+function onState(snap){
+ if(!snap.exists){ST=null;if(first){first=false;put(fresh())}render();draw();return}
+ const prev=ST;ST=snap.data();
+ seat=ST.seats.X===uid?"X":ST.seats.Y===uid?"Y":null;
+ if(ST.game!==curGame){curGame=ST.game;wroteFinal=false;mine={};FIN={X:null,Y:null};if(uid)loadMine();}
+ if(ST.spin&&ST.spin.id!==lastSpin){lastSpin=ST.spin.id;startSpin(ST.spin,first)}
+ first=false;
+ if(ST.over&&seat&&!wroteFinal){wroteFinal=true;db.doc("t20/final_"+seat).set({game:ST.game,picks:mine}).catch(()=>{wroteFinal=false});}
+ render();if(!animating)draw();
+}
+function onFinal(k){return snap=>{FIN[k]=snap.exists?snap.data():null;render()}}
+
+async function claim(k){
+ const cur=ST||fresh();if(cur.seats[k])return;
+ const seats={...cur.seats};seats[k]=uid;
+ if(cur.seats.X===uid||cur.seats.Y===uid)return;
+ await put({...cur,seats});
+}
+function doSpin(){
+ if(!ST||animating||ST.spin||ST.over||seat!==ST.turn||!ST.seats.X||!ST.seats.Y)return;
+ const rem=remaining(),t=Math.floor(Math.random()*rem.length);
+ put({...ST,spin:{id:Date.now()+"-"+Math.floor(Math.random()*1e6),idx:rem[t],jit:Math.random()-.5,by:seat}});
+}
+function finish(lockedSi){
+ const sp=ST.spin;if(lockedSi!=null){mine[lockedSi]=sp.idx;saveMine();}
+ const cnt={...ST.cnt},skips={...ST.skips};
+ if(lockedSi!=null)cnt[seat]++;else skips[seat]--;
+ const over=cnt.X===8&&cnt.Y===8,o=seat==="X"?"Y":"X";
+ put({...ST,removed:[...ST.removed,sp.idx],spin:null,cnt,skips,over,turn:over?ST.turn:(cnt[o]===8?seat:o)});
+}
+function newGame(){put(fresh(ST?ST.seats:null))}
+
+function render(){
+ if(!ST){$("turn").textContent="Game load ho raha hai…";$("pick").innerHTML="";return}
+ const both=ST.seats.X&&ST.seats.Y,fin=FIN.X&&FIN.Y&&FIN.X.game===ST.game&&FIN.Y.game===ST.game;
+ $("turn").innerHTML=ST.over?"Game khatam":both?`Baari: <span class="t${ST.turn.toLowerCase()}">Player ${ST.turn}</span>${seat===ST.turn?" (aap)":""}`:"Players ka intezaar";
+ $("left").textContent=`Wheel me ${remaining().length} players bache hain · Skip bache: X ${ST.skips.X} · Y ${ST.skips.Y}`;
+ $("spin").disabled=!(both&&!ST.over&&!ST.spin&&!animating&&seat===ST.turn);
+ const pk=$("pick");
+ if(!seat&&!(ST.seats.X&&ST.seats.Y)){
+  pk.innerHTML=`<div class="pname">Seat chuniye</div><p class="hint">Ek seat lene par wo aapki ho jati hai. Doosra player is link ko khol ke doosri seat lega.</p>`+
+   ["X","Y"].map(k=>ST.seats[k]?"":`<button class="reset" data-k="${k}" style="margin-right:8px">Player ${k} banunga</button>`).join("");
+  pk.querySelectorAll("button").forEach(b=>b.onclick=()=>claim(b.dataset.k));
+ }else if(!seat){pk.innerHTML=`<p class="hint">Dono seat bhar chuki hain. Aap sirf dekh sakte hain.</p>`}
+ else if(ST.over){
+  if(!fin){pk.innerHTML=`<div class="pname">Result aa raha hai…</div><p class="hint">Doosre player ke stats reveal hone ka intezaar.</p>`}
+  else{let x=0,y=0;S.forEach((s,i)=>{const c=better(RAW[FIN.X.picks[i]],RAW[FIN.Y.picks[i]],s);if(c>0)x++;else if(c<0)y++});
+   pk.innerHTML=`<div class="pname">${x===y?"Draw!":x>y?"Player X jeeta!":"Player Y jeeta!"}</div><p class="pmeta">X: ${x} stats jeete, Y: ${y} stats jeete</p><button class="reset" id="ng">Naya game</button>`;$("ng").onclick=newGame}
+ }else if(!both){pk.innerHTML=`<div class="pname">Aap Player ${seat} hain</div><p class="hint">Doosre player ko ye page ka link bhejiye aur uske seat lene ka intezaar kijiye.</p>`}
+ else if(ST.spin&&ST.spin.by===seat&&!animating){
+  const p=RAW[ST.spin.idx],used=mine;
+  pk.innerHTML=`<div class="pname">${p[0]}</div><div class="pmeta">${p[1]} · ek stat chuniye ya skip kijiye (doosre ko ye nahi dikhega)</div><div class="stats">`+
+   S.map((s,i)=>`<button class="stat" data-i="${i}" ${used[i]!=null?"disabled":""}><span>${s.l}</span><b>${show(p,s)}</b></button>`).join("")+
+   `</div><button class="reset" id="sk" ${ST.skips[seat]<1?"disabled":""}>Skip (${ST.skips[seat]} bache)</button>`;
+  pk.querySelectorAll(".stat").forEach(b=>b.onclick=()=>finish(+b.dataset.i));$("sk").onclick=()=>finish(null);
+ }else{
+  pk.innerHTML=`<div class="pname">Aap Player ${seat}</div><p class="hint">${animating?"Wheel ghoom raha hai…":ST.spin?`Player ${ST.spin.by} stat chun raha hai…`:ST.turn===seat?"Aapki baari, SPIN dabaiye.":`Player ${ST.turn} ki baari hai.`}</p>`;
+ }
+ let h=`<tr><th>Stat</th><th class="tx">Player X</th><th class="ty">Player Y</th></tr>`;
+ const cell=(k,i,cl,w)=>{let p=null;if(fin)p=RAW[FIN[k].picks[i]];else if(k===seat&&mine[i]!=null)p=RAW[mine[i]];
+  return p?`<td class="${cl} ${w}">${last(p[0])} <b>${show(p,S[i])}</b></td>`:`<td class="hint">${fin||k===seat?"—":"🔒"}</td>`};
+ S.forEach((s,i)=>{let wx="",wy="";if(fin){const c=better(RAW[FIN.X.picks[i]],RAW[FIN.Y.picks[i]],s);if(c>0)wx="win";else if(c<0)wy="win"}
+  h+=`<tr><td>${s.l}</td>${cell("X",i,"tx",wx)}${cell("Y",i,"ty",wy)}</tr>`});
+ $("board").innerHTML=h;
+ $("bh").textContent=fin?"Bowling avg aur economy me kam value behtar.":`Locked stats: X ${ST.cnt.X}/8 · Y ${ST.cnt.Y}/8. Doosre ke stats game ke ant me khulenge.`;
+}
+$("spin").onclick=doSpin;
+
+(async()=>{
+ render();
+ if(!window.claude){note("Ye page Claude ke andar published artifact ke roop me hi online chalta hai.");return}
+ const [d,u]=await Promise.all([claude.use("db"),claude.use("user")]);
+ if(!d||!u){note("Online mode ke liye sign-in aur access chahiye. Owner se invite maangein.");return}
+ db=d;uid=await u.id();
+ if(!uid){note("Aapki pehchan nahi mil payi, sign-in karke dobara kholiye.");return}
+ stRef=db.doc("t20/state");
+ stRef.onSnapshot(onState,e=>note("Connection error: "+e.code));
+ db.doc("t20/final_X").onSnapshot(onFinal("X"));db.doc("t20/final_Y").onSnapshot(onFinal("Y"));
+})();
+</script>
+</body>
+</html>
